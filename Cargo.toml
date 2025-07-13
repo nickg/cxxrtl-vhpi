@@ -1,3 +1,12 @@
-[workspace]
-members = ["bindings", "vhpi", "plugin"]
-resolver = "2"
+[package]
+name = "cxxrtl-vhpi"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+vhpi = { git = "https://github.com/nickg/rust-vhpi.git" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

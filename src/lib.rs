@@ -1,4 +1,5 @@
 use std::ffi::{CString, CStr};
+use std::iter::Once;
 use std::ptr;
 use std::net::{TcpListener, TcpStream};
 use std::io::{BufReader, BufRead, Write};
@@ -8,11 +9,6 @@ use std::collections::HashMap;
 use serde::{Serialize, Deserialize};
 
 use vhpi;
-use bindings::{
-    vhpiCbDataT, vhpiCbDataS, vhpi_register_cb,
-    vhpiHandleT, vhpiTimeT, vhpiValueT,
-    vhpiCbStartOfSimulation,
-};
 
 #[derive(Deserialize)]
 struct GreetingRequest {
@@ -214,33 +210,26 @@ fn handle_list_scopes(_req: &ListScopesRequest, stream: &mut TcpStream) {
         },
     );
 
-    unsafe {
-        let root: vhpiHandleT = bindings::vhpi_handle(bindings::vhpiOneToOneT_vhpiRootInst,
-                                                      ptr::null_mut());
+    let root = vhpi::Handle::null().handle(vhpi::OneToOne::RootInst);
+    let root_name = root.get_name();
 
-        let root_name_ptr = bindings::vhpi_get_str(bindings::vhpiStrPropertyT_vhpiNameP, root);
-        let root_name = CStr::from_ptr(root_name_ptr as *const i8).to_str().unwrap();
+    println!("Root name {}", root_name);
 
-        println!("Root name {}", root_name);
-
-        scopes.insert(
-            root_name,
-            ScopeEntry {
-                scope_type: "module",
-                definition: ScopeDefinition {
-                    src: None,
-                    name: None,
-                    attributes: HashMap::new(),
-                },
-                instantiation: ScopeInstantiation {
-                    src: Some("top.py:50"),
-                    attributes: HashMap::new(),
-                },
+    scopes.insert(
+        root_name.as_str(),
+        ScopeEntry {
+            scope_type: "module",
+            definition: ScopeDefinition {
+                src: None,
+                name: Some(&root_name),
+                attributes: HashMap::new(),
             },
-        );
-
-        bindings::vhpi_release_handle(root);
-    }
+            instantiation: ScopeInstantiation {
+                src: Some("top.py:50"),
+                attributes: HashMap::new(),
+            },
+        },
+    );
 
     let response = ListScopesResponse {
         msg_type: "response",
@@ -313,7 +302,7 @@ fn handle_client(mut stream: TcpStream) {
     }
 }
 
-unsafe extern "C" fn start_of_sim(cb_data: *const vhpiCbDataS) {
+fn start_of_sim(_data: &vhpi::CbData) {
     println!("Start of simulation callback triggered");
 
     const ADDR: &str = "127.0.0.1:4567";
@@ -333,8 +322,7 @@ unsafe extern "C" fn start_of_sim(cb_data: *const vhpiCbDataS) {
 pub extern "C" fn cxxrtl_startup() {
     vhpi::printf("CXXRTL plugin loaded");
 
-    vhpi::Callback::new(vhpi::CbReason::StartOfSimulation, start_of_sim)
-        .register();
+    vhpi::register_cb(vhpi::CbReason::StartOfSimulation, start_of_sim);
 }
 
 type StartupFn = extern "C" fn();
