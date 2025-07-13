@@ -1,3 +1,3 @@
 [workspace]
-members = ["bindings", "plugin"]
+members = ["bindings", "vhpi", "plugin"]
 resolver = "2"

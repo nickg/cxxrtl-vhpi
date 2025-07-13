@@ -7,6 +7,7 @@ use std::collections::HashMap;
 
 use serde::{Serialize, Deserialize};
 
+use vhpi;
 use bindings::{
     vhpiCbDataT, vhpiCbDataS, vhpi_register_cb,
     vhpiHandleT, vhpiTimeT, vhpiValueT,
@@ -221,7 +222,7 @@ fn handle_list_scopes(_req: &ListScopesRequest, stream: &mut TcpStream) {
         let root_name = CStr::from_ptr(root_name_ptr as *const i8).to_str().unwrap();
 
         println!("Root name {}", root_name);
-        
+
         scopes.insert(
             root_name,
             ScopeEntry {
@@ -237,7 +238,7 @@ fn handle_list_scopes(_req: &ListScopesRequest, stream: &mut TcpStream) {
                 },
             },
         );
-        
+
         bindings::vhpi_release_handle(root);
     }
 
@@ -314,7 +315,7 @@ fn handle_client(mut stream: TcpStream) {
 
 unsafe extern "C" fn start_of_sim(cb_data: *const vhpiCbDataS) {
     println!("Start of simulation callback triggered");
-    
+
     const ADDR: &str = "127.0.0.1:4567";
 
     let listener = TcpListener::bind(ADDR).expect("Failed to bind socket");
@@ -330,23 +331,10 @@ unsafe extern "C" fn start_of_sim(cb_data: *const vhpiCbDataS) {
 
 #[no_mangle]
 pub extern "C" fn cxxrtl_startup() {
-    let msg = CString::new("CXXRTL plugin loaded").unwrap();
-    unsafe {
-        bindings::vhpi_printf(msg.as_ptr());
-    }
+    vhpi::printf("CXXRTL plugin loaded");
 
-    let mut cb_data = vhpiCbDataS {
-        reason: vhpiCbStartOfSimulation as i32,
-        cb_rtn: Some(start_of_sim),
-        obj: ptr::null_mut(),
-        time: ptr::null_mut(),
-        value: ptr::null_mut(),
-        user_data: ptr::null_mut(),
-    };
-
-    unsafe {
-        let _handle: vhpiHandleT = vhpi_register_cb(&mut cb_data as *mut _, 0);
-    }
+    vhpi::Callback::new(vhpi::CbReason::StartOfSimulation, start_of_sim)
+        .register();
 }
 
 type StartupFn = extern "C" fn();
